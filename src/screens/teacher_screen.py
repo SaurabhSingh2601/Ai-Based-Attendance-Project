@@ -6,7 +6,7 @@ from src.components.dialog_share_subject import share_subject_dialog
 from src.components.footer import footer_dashboard
 from src.components.header import header_dashboard
 from src.ui.base_layout import style_background_dashboard, style_base_layout
-from src.database.db import check_teacher_exists, create_teacher, teacher_login, get_teacher_subjects, get_attendance_for_teacher
+from src.database.db import check_teacher_exists, create_teacher, teacher_login, get_teacher_subjects, get_attendance_for_teacher, create_attendance
 from src.components.dialog_create_subject import create_subject_dialog
 from src.components.subject_card import subject_card
 from src.components.dialog_add_photo import add_photos_dialog
@@ -113,7 +113,7 @@ def teacher_tab_take_attendance():
                             "student_id": sid,
                             "subject_id": selected_subject_id,
                             "timestamp": current_timestamp,
-                            "is_present": bool(is_present)
+                            "ispresent": bool(is_present)
                         })
 
                     st.subheader("Attendance Results")
@@ -121,7 +121,7 @@ def teacher_tab_take_attendance():
 
                     if attendance_to_log:
                         try:
-                            supabase.table('attendance_logs').insert(attendance_to_log).execute()
+                            create_attendance(attendance_to_log)
                             st.success("Attendance logged successfully!")
                         except Exception as e:
                             st.error(f"Failed to log attendance: {str(e)}")
@@ -183,12 +183,13 @@ def teacher_tab_attendance_records():
     for r in records:
         ts = r.get('timestamp')
         subj = r.get('subjects', {})
+        pres_val = r.get('ispresent') if r.get('ispresent') is not None else r.get('is_present', False)
         data.append({
             "ts_group": ts.split(".")[0] if ts else None,
             "Time": datetime.fromisoformat(ts).strftime("%Y-%m-%d %I:%M %p") if ts else "N/A",
             "Subject": subj.get('name', 'N/A'),
             "Subject Code": subj.get('subject_code', 'N/A'),
-            "is_present": bool(r.get('is_present', False))
+            "is_present": bool(pres_val)
         })
 
     df = pd.DataFrame(data)

@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS public.attendance_logs (
     student_id BIGINT NOT NULL REFERENCES public.students(id) ON DELETE CASCADE,
     subject_id BIGINT NOT NULL REFERENCES public.subjects(id) ON DELETE CASCADE,
     timestamp TEXT NOT NULL,
-    is_present BOOLEAN DEFAULT FALSE NOT NULL,
+    ispresent BOOLEAN DEFAULT FALSE NOT NULL,
     created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 

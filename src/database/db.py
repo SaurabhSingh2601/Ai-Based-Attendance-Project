@@ -85,7 +85,16 @@ def get_student_attendance(student_id):
     return response.data or []
 
 def create_attendance(logs):
-    response = supabase.table('attendance_logs').insert(logs).execute()
+    formatted_logs = []
+    for item in logs:
+        log_copy = dict(item)
+        val = log_copy.pop('is_present', None)
+        if val is not None and 'ispresent' not in log_copy:
+            log_copy['ispresent'] = bool(val)
+        elif 'ispresent' in log_copy:
+            log_copy['ispresent'] = bool(log_copy['ispresent'])
+        formatted_logs.append(log_copy)
+    response = supabase.table('attendance_logs').insert(formatted_logs).execute()
     return response.data
 
 def get_attendance_for_teacher(teacher_id):

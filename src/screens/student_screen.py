@@ -59,7 +59,8 @@ def student_dashboard():
             stats_map[sid] = {"total": 0, "attended": 0}
 
         stats_map[sid]['total'] += 1
-        if log.get('is_present'):
+        is_pres = log.get('ispresent') if log.get('ispresent') is not None else log.get('is_present', False)
+        if is_pres:
             stats_map[sid]['attended'] += 1
 
     if not subjects:
