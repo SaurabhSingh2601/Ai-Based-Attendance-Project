@@ -1,13 +1,13 @@
 services:
   - type: web
-    name: ai-based-attendance
-    env: docker
-    plan: free
-    dockerfilePath: Dockerfile
+    name: snapclass-attendance
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: streamlit run app.py --server.port $PORT --server.address 0.0.0.0
     envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.10
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_KEY
         sync: false
-      - key: PORT
-        value: 8501
