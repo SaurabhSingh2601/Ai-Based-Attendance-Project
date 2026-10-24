@@ -93,7 +93,7 @@ def style_base_layout():
                     color:white !important;
                     padding: 10px 20px !important;
                     border:none !important;
-                    transistion:transform 0.25s ease-in-out !important;
+                    transition:transform 0.25s ease-in-out !important;
                 
 
                     
@@ -105,7 +105,7 @@ def style_base_layout():
                     color:white !important;
                     padding: 10px 20px !important;
                     border:none !important;
-                    transistion:transform 0.25s ease-in-out !important;
+                    transition:transform 0.25s ease-in-out !important;
                 
 
                     

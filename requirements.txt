@@ -2,15 +2,15 @@ streamlit
 numpy
 pandas
 scikit-learn
-dlib-bin
+dlib-bin; sys_platform == 'win32'
+dlib; sys_platform != 'win32'
 git+https://github.com/ageitgey/face_recognition_models
 setuptools
-
+python-dotenv
 supabase
 bcrypt
 segno
 pillow
-
-
 librosa
+soundfile
 resemblyzer

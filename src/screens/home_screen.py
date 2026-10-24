@@ -6,7 +6,7 @@ from src.ui.base_layout import style_base_layout,style_background_home
 def home_screen():
     
     header_home()
-    style_base_layout() ,
+    style_base_layout()
     style_background_home()
 
     col1,col2=st.columns(2)
