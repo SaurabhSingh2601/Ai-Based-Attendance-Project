@@ -3,8 +3,9 @@ FROM python:3.11-slim
 # Prevent interactive prompts
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
+ENV CMAKE_BUILD_PARALLEL_LEVEL=1
 
-# Install system dependencies required for cmake, dlib, opencv, and librosa/audio
+# Install system dependencies required for opencv, audio, and tools
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     cmake \
@@ -24,11 +25,14 @@ WORKDIR /app
 # Upgrade pip and setuptools
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel
 
-# Install requirements
+# 1. Install lightweight CPU-only PyTorch first (avoids downloading 3.5GB of NVIDIA CUDA wheels on Render)
+RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
+
+# 2. Install remaining requirements (dlib-bin will now use pre-compiled Linux binary wheel in 2 seconds)
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
+# 3. Copy application code
 COPY . .
 
 # Expose Render default port
