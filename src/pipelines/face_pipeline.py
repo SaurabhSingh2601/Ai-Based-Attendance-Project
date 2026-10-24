@@ -34,7 +34,10 @@ def get_trained_models():
     X = []
     y = []
 
-    student_db = get_all_students()
+    try:
+        student_db = get_all_students()
+    except Exception:
+        student_db = []
 
     if not student_db:
         return None

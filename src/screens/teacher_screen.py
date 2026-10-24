@@ -265,16 +265,18 @@ def teacher_dashboard():
 
 def login_teacher(username, password):
     if not username or not password:
-        return False
+        return False, "Please enter both username and password."
 
-    teacher = teacher_login(username, password)
-    if teacher:
-        st.session_state.user_role = "teacher"
-        st.session_state.teacher_data = teacher
-        st.session_state.is_logged_in = True
-        return True
-
-    return False
+    try:
+        teacher = teacher_login(username, password)
+        if teacher:
+            st.session_state.user_role = "teacher"
+            st.session_state.teacher_data = teacher
+            st.session_state.is_logged_in = True
+            return True, "Welcome Back!"
+        return False, "Invalid Username or Password Entered!"
+    except Exception as e:
+        return False, f"Database Connection Error: {str(e)}"
 
 
 def teacher_screen_login():
@@ -297,13 +299,14 @@ def teacher_screen_login():
 
     with btnc1:
         if st.button("Login", icon=":material/passkey:", shortcut="control+enter", width="stretch"):
-            if login_teacher(teacher_username, teacher_pass):
-                st.toast("Welcome Back!")
+            success, msg = login_teacher(teacher_username, teacher_pass)
+            if success:
+                st.toast(msg)
                 import time
                 time.sleep(1)
                 st.rerun()
             else:
-                st.error("Invalid Username or Password Entered!")
+                st.error(msg)
 
     with btnc2:
         if st.button("Register Instead", type="primary", icon=":material/passkey:", shortcut="control+enter", width="stretch"):
@@ -316,16 +319,16 @@ def teacher_screen_login():
 def teacher_register(teacher_name, teacher_pass, teacher_username, teacher_pass_confirm):
     if not teacher_username or not teacher_pass or not teacher_name:
         return False, "All Fields Are Required!"
-    if check_teacher_exists(teacher_username):
-        return False, "Username already Taken!"
     if teacher_pass != teacher_pass_confirm:
         return False, "Passwords do not match!"
 
     try:
+        if check_teacher_exists(teacher_username):
+            return False, "Username already Taken!"
         create_teacher(teacher_username, teacher_pass, teacher_name)
         return True, "Successfully Created, Login Now!"
     except Exception as e:
-        return False, f"Error: {str(e)}"
+        return False, f"Database Error: {str(e)}"
 
 
 def teacher_screen_register():

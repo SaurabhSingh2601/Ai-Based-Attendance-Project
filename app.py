@@ -5,6 +5,7 @@ from src.screens.home_screen import home_screen
 from src.screens.student_screen import student_screen
 from src.screens.teacher_screen import teacher_screen
 from src.components.dialog_auto_enroll import auto_enroll_dialog
+from src.database.config import is_configured
 
 
 def main():
@@ -13,6 +14,14 @@ def main():
         page_icon="https://i.ibb.co/YTYGn5qV/logo.png",
         layout="wide"
     )
+
+    if not is_configured:
+        st.error(
+            "🚨 **Supabase Credentials Missing in Render!**\n\n"
+            "Please go to your **Render Dashboard -> Environment** tab and add:\n"
+            "- `SUPABASE_URL`\n"
+            "- `SUPABASE_KEY`"
+        )
     if 'login_type' not in st.session_state:
         st.session_state['login_type'] = 'None'
 

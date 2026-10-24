@@ -125,7 +125,11 @@ def student_screen():
             else:
                 if detected:
                     matched_id = list(detected.keys())[0]
-                    all_students = get_all_students()
+                    try:
+                        all_students = get_all_students()
+                    except Exception as e:
+                        st.error(f"Database error: {str(e)}")
+                        all_students = []
                     student = next(
                         (s for s in all_students if (s.get("id") == matched_id or s.get("student_id") == matched_id)),
                         None
@@ -174,7 +178,11 @@ def student_screen():
                                 except Exception:
                                     voice_emb = None
 
-                            response_data = create_students(new_name, face_embedding=face_emb, voice_embedding=voice_emb)
+                            try:
+                                response_data = create_students(new_name, face_embedding=face_emb, voice_embedding=voice_emb)
+                            except Exception as e:
+                                st.error(f"Database Error: {str(e)}")
+                                response_data = None
 
                             if response_data:
                                 train_classifier()
