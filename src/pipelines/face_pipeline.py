@@ -1,3 +1,4 @@
+import src.pkg_resources_shim  # Compatibility shim for face_recognition_models
 import dlib
 import numpy as np
 import face_recognition_models

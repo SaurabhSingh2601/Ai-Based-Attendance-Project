@@ -1,3 +1,4 @@
+import src.pkg_resources_shim  # Compatibility shim for face_recognition_models & webrtcvad
 import streamlit as st
 
 from src.screens.home_screen import home_screen

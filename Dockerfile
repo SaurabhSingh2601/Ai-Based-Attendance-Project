@@ -22,8 +22,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Upgrade pip and setuptools
-RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+# Upgrade pip and setuptools (pinned to <81 to keep pkg_resources support)
+RUN pip install --no-cache-dir --upgrade pip "setuptools<81.0.0" wheel
 
 # 1. Install lightweight CPU-only PyTorch first (avoids downloading 3.5GB of NVIDIA CUDA wheels on Render)
 RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
