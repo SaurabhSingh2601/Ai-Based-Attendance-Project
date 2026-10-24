@@ -1,3 +1,4 @@
+import src.pkg_resources_shim  # Compatibility shim for face_recognition_models
 import streamlit as st
 from src.ui.base_layout import style_background_dashboard, style_base_layout
 from src.components.footer import footer_dashboard
@@ -42,8 +43,13 @@ def student_dashboard():
     st.divider()
 
     with st.spinner("Loading Your Subjects..."):
-        subjects = get_student_subjects(student_id)
-        logs = get_student_attendance(student_id)
+        try:
+            subjects = get_student_subjects(student_id)
+            logs = get_student_attendance(student_id)
+        except Exception as e:
+            st.error(f"Failed to load subjects: {str(e)}")
+            subjects = []
+            logs = []
 
     stats_map = {}
     for log in logs:
@@ -67,9 +73,12 @@ def student_dashboard():
         def make_unenroll_btn(subj_id, subj_name):
             def unenroll_button():
                 if st.button("Unenroll", type="tertiary", width="stretch", icon=":material/delete_forever:", key=f'unenroll_{subj_id}'):
-                    unenroll_student_to_subject(student_id, subj_id)
-                    st.toast(f'Unenrolled from {subj_name} successfully!')
-                    st.rerun()
+                    try:
+                        unenroll_student_to_subject(student_id, subj_id)
+                        st.toast(f'Unenrolled from {subj_name} successfully!')
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Failed to unenroll: {str(e)}")
             return unenroll_button
 
         with cols[i % 2]:
@@ -112,39 +121,53 @@ def student_screen():
 
     photo_source = st.camera_input("Position your face in center")
     if photo_source:
-        img = np.array(Image.open(photo_source))
+        # Determine unique photo key so we only process AI scan ONCE per capture
+        photo_id = getattr(photo_source, 'file_id', str(len(photo_source.getvalue())))
 
-        with st.spinner("AI Is Scanning..."):
-            detected, all_ids, num_faces = predict_attendance(img)
+        if st.session_state.get('last_scanned_photo_id') != photo_id:
+            with st.spinner("AI Is Scanning..."):
+                img = np.array(Image.open(photo_source))
+                detected, all_ids, num_faces, encodings = predict_attendance(img, return_encodings=True)
+                st.session_state['last_scanned_photo_id'] = photo_id
+                st.session_state['scan_detected'] = detected
+                st.session_state['scan_num_faces'] = num_faces
+                st.session_state['scan_encodings'] = encodings
+                st.session_state['show_registration'] = False
 
-            if num_faces == 0:
-                st.warning("No face detected! Please ensure your face is well lit and centered.")
-                st.session_state.show_registration = True
-            elif num_faces > 1:
-                st.warning("Multiple faces detected! Please ensure only one person is in the frame.")
+        # Read cached scan results (lightning-fast, no 30-second re-scan on every button/keystroke!)
+        detected = st.session_state.get('scan_detected', {})
+        num_faces = st.session_state.get('scan_num_faces', 0)
+        encodings = st.session_state.get('scan_encodings', [])
+
+        if num_faces == 0:
+            st.warning("No face detected! Please ensure your face is well lit and centered.")
+            st.session_state.show_registration = True
+        elif num_faces > 1:
+            st.warning("Multiple faces detected! Please ensure only one person is in the frame.")
+        else:
+            if detected:
+                matched_id = list(detected.keys())[0]
+                try:
+                    all_students = get_all_students()
+                except Exception as e:
+                    st.error(f"Database error: {str(e)}")
+                    all_students = []
+
+                student = next(
+                    (s for s in all_students if (s.get("id") == matched_id or s.get("student_id") == matched_id)),
+                    None
+                )
+                if student:
+                    st.session_state.is_logged_in = True
+                    st.session_state.user_role = "student"
+                    st.session_state.student_data = student
+                    st.toast(f"Welcome Back, {student.get('name')}!")
+                    import time
+                    time.sleep(1)
+                    st.rerun()
             else:
-                if detected:
-                    matched_id = list(detected.keys())[0]
-                    try:
-                        all_students = get_all_students()
-                    except Exception as e:
-                        st.error(f"Database error: {str(e)}")
-                        all_students = []
-                    student = next(
-                        (s for s in all_students if (s.get("id") == matched_id or s.get("student_id") == matched_id)),
-                        None
-                    )
-                    if student:
-                        st.session_state.is_logged_in = True
-                        st.session_state.user_role = "student"
-                        st.session_state.student_data = student
-                        st.toast(f"Welcome Back, {student.get('name')}!")
-                        import time
-                        time.sleep(1)
-                        st.rerun()
-                else:
-                    st.info("Face not recognized in the database. Please register below!")
-                    st.session_state.show_registration = True
+                st.info("Face not recognized in the database. Please register below!")
+                st.session_state.show_registration = True
 
     if st.session_state.show_registration:
         with st.container(border=True):
@@ -161,25 +184,37 @@ def student_screen():
                 st.info("Voice recording is optional or not supported on this browser.")
 
             if st.button("Create Account", type="primary"):
-                if not new_name:
+                if not new_name.strip():
                     st.warning("Please enter your name!")
                 elif not photo_source:
                     st.warning("Please capture a photo first using the camera above!")
                 else:
-                    with st.spinner("Creating profile..."):
+                    encodings = st.session_state.get('scan_encodings', [])
+                    if not encodings:
                         img = np.array(Image.open(photo_source))
                         encodings = get_face_embeddings(img)
-                        if encodings:
-                            face_emb = encodings[0].tolist()
+
+                    if not encodings:
+                        st.error("Couldn't extract facial features from the photo. Please retake the photo with better lighting!")
+                    else:
+                        with st.spinner("Saving your profile..."):
+                            face_emb = encodings[0].tolist() if hasattr(encodings[0], 'tolist') else list(encodings[0])
                             voice_emb = None
+
                             if audio_data is not None:
                                 try:
-                                    voice_emb = get_voice_embeddings(audio_data.read())
+                                    audio_bytes = audio_data.read()
+                                    if audio_bytes:
+                                        voice_emb = get_voice_embeddings(audio_bytes)
                                 except Exception:
                                     voice_emb = None
 
                             try:
-                                response_data = create_students(new_name, face_embedding=face_emb, voice_embedding=voice_emb)
+                                response_data = create_students(
+                                    new_name.strip(),
+                                    face_embedding=face_emb,
+                                    voice_embedding=voice_emb
+                                )
                             except Exception as e:
                                 st.error(f"Database Error: {str(e)}")
                                 response_data = None
@@ -189,13 +224,12 @@ def student_screen():
                                 st.session_state.is_logged_in = True
                                 st.session_state.user_role = "student"
                                 st.session_state.student_data = response_data[0] if isinstance(response_data, list) else response_data
-                                st.toast(f"Profile Created! Hi {new_name}!")
+                                st.session_state.pop('last_scanned_photo_id', None)
+                                st.toast(f"Profile Created! Hi {new_name.strip()}!")
                                 import time
-                                time.sleep(1.5)
+                                time.sleep(1)
                                 st.rerun()
                             else:
-                                st.error("Failed to save profile in database.")
-                        else:
-                            st.error("Couldn't extract facial features from the captured photo. Please try again with better lighting!")
+                                st.error("Failed to save profile in database. Please check connection.")
 
     footer_dashboard()

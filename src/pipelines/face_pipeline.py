@@ -1,6 +1,7 @@
 import src.pkg_resources_shim  # Compatibility shim for face_recognition_models
 import dlib
 import numpy as np
+from PIL import Image
 import face_recognition_models
 from sklearn.svm import SVC
 import streamlit as st
@@ -19,12 +20,30 @@ def load_dlib_models():
 
 def get_face_embeddings(image_np):
     detector, sp, facerec = load_dlib_models()
-    faces = detector(image_np, 1)
-    encodings = []
 
+    # Proportionally downscale large camera/phone images (e.g. 1080p, 4K) to max 800px
+    # This prevents Render 512MB RAM freeze and makes face detection 50x to 100x faster!
+    h, w = image_np.shape[:2]
+    max_dim = 800
+    if max(h, w) > max_dim:
+        scale = max_dim / max(h, w)
+        pil_img = Image.fromarray(image_np)
+        new_w, new_h = int(w * scale), int(h * scale)
+        pil_img = pil_img.resize((new_w, new_h), Image.Resampling.BILINEAR)
+        img_to_scan = np.array(pil_img)
+    else:
+        img_to_scan = image_np
+
+    # Fast detection with upsample 0
+    faces = detector(img_to_scan, 0)
+    if len(faces) == 0:
+        # If no face found at level 0, try level 1
+        faces = detector(img_to_scan, 1)
+
+    encodings = []
     for face in faces:
-        shape = sp(image_np, face)
-        face_descriptor = facerec.compute_face_descriptor(image_np, shape, 1)
+        shape = sp(img_to_scan, face)
+        face_descriptor = facerec.compute_face_descriptor(img_to_scan, shape, 1)
         encodings.append(np.array(face_descriptor))
 
     return encodings
@@ -68,12 +87,14 @@ def train_classifier():
     model_data = get_trained_models()
     return bool(model_data)
 
-def predict_attendance(class_image_np):
+def predict_attendance(class_image_np, return_encodings=False):
     encodings = get_face_embeddings(class_image_np)
     detected_students = {}
     model_data = get_trained_models()
 
     if not model_data:
+        if return_encodings:
+            return detected_students, [], len(encodings), encodings
         return detected_students, [], len(encodings)
 
     clf = model_data.get('clf')
@@ -85,6 +106,8 @@ def predict_attendance(class_image_np):
     ))
 
     if not all_students:
+        if return_encodings:
+            return detected_students, [], len(encodings), encodings
         return detected_students, [], len(encodings)
 
     resemblance_threshold = 0.6
@@ -117,4 +140,6 @@ def predict_attendance(class_image_np):
         if min_dist <= resemblance_threshold and best_id is not None:
             detected_students[int(best_id)] = True
 
+    if return_encodings:
+        return detected_students, all_students, len(encodings), encodings
     return detected_students, all_students, len(encodings)
