@@ -19,10 +19,22 @@ def load_dlib_models():
     return detector, sp, facerec
 
 def get_face_embeddings(image_np):
+    if image_np is None:
+        return []
+
+    # Ensure 3-channel RGB uint8 image (crucial: converts RGBA to RGB to avoid dlib RuntimeError)
+    if len(image_np.shape) == 2:
+        image_np = np.stack((image_np,) * 3, axis=-1)
+    elif len(image_np.shape) == 3 and image_np.shape[2] == 4:
+        image_np = image_np[:, :, :3]
+
+    if image_np.dtype != np.uint8:
+        image_np = image_np.astype(np.uint8)
+
     detector, sp, facerec = load_dlib_models()
 
     # Proportionally downscale large camera/phone images (e.g. 1080p, 4K) to max 800px
-    # This prevents Render 512MB RAM freeze and makes face detection 50x to 100x faster!
+    # This prevents memory spikes and speeds up face detection 50x-100x!
     h, w = image_np.shape[:2]
     max_dim = 800
     if max(h, w) > max_dim:
@@ -37,14 +49,17 @@ def get_face_embeddings(image_np):
     # Fast detection with upsample 0
     faces = detector(img_to_scan, 0)
     if len(faces) == 0:
-        # If no face found at level 0, try level 1
+        # Try level 1 if no face found at level 0
         faces = detector(img_to_scan, 1)
 
     encodings = []
     for face in faces:
-        shape = sp(img_to_scan, face)
-        face_descriptor = facerec.compute_face_descriptor(img_to_scan, shape, 1)
-        encodings.append(np.array(face_descriptor))
+        try:
+            shape = sp(img_to_scan, face)
+            face_descriptor = facerec.compute_face_descriptor(img_to_scan, shape, 1)
+            encodings.append(np.array(face_descriptor))
+        except Exception:
+            pass
 
     return encodings
 
@@ -83,7 +98,11 @@ def get_trained_models():
     return {'clf': clf, 'X': X, 'y': y}
 
 def train_classifier():
-    st.cache_resource.clear()
+    # Clear only the student classifier cache without reloading 200MB dlib models from disk!
+    try:
+        get_trained_models.clear()
+    except Exception:
+        pass
     model_data = get_trained_models()
     return bool(model_data)
 
